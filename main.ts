@@ -4,6 +4,7 @@ import { MetatemplatesSettings, MetatemplatesSettingTab, DEFAULT_SETTINGS } from
 
 import type { Moment } from 'moment';
 import * as jsyaml from './js-yaml';
+import { type } from 'os';
 
 declare global {
   function moment(): Moment;
@@ -13,6 +14,8 @@ export default class Metatemplates extends Plugin {
   settings: MetatemplatesSettings;
   templates: Array<TFile>;
   type2titles: Map<string, string>;
+  type2lastmod: Map<string, string>;
+  lastmodTime: number;
 
   async onload() {
     console.log('loading plugin: metatemplates');
@@ -66,6 +69,8 @@ export default class Metatemplates extends Plugin {
           this.app.vault.rename(file, newpath);
         }
       }
+
+      this.updateLastMod(file, fm);
     });
 
     this.app.workspace.on('layout-ready', () => {
@@ -73,11 +78,47 @@ export default class Metatemplates extends Plugin {
     })
   }
 
+  async updateLastMod(file: TFile, fm: FrontMatterCache, gapTime = 5000) {
+    let nowTime = Date.now();
+    if (this.lastmodTime && nowTime - this.lastmodTime <= gapTime) {
+      return;
+    }
+
+    let lastmod = this.composeLastMod(fm);
+    if (lastmod) {
+      let content = await this.app.vault.read(file);
+      let newContent = content.replace(new RegExp(/lastmod:.+/, 'g'), "lastmod: '" + lastmod + "'");
+      newContent = newContent.replace(new RegExp(/Created at: .+/), '');
+      newContent = newContent.replace(new RegExp(/Updated at: .+/), '');
+      newContent = newContent.replace(new RegExp(/# .+/), '');
+      this.app.vault.modify(file, newContent);
+      this.lastmodTime = nowTime;
+    }
+  }
+
+  composeLastMod(fm: FrontMatterCache): string {
+    let lastmod = parseFrontMatterEntry(fm, 'lastmod');
+    if (!lastmod) {
+      return;
+    }
+
+    let lastmodFormat = this.type2lastmod.get(parseFrontMatterEntry(fm, 'type'));
+    if (!lastmodFormat) {
+      return;
+    }
+
+    lastmod = (<any>lastmodFormat).replaceAll("<<date>>", moment().format(this.settings.dateFormat));
+    lastmod = (<any>lastmod).replaceAll("<<time>>", moment().format(this.settings.timeFormat));
+    
+    return lastmod;
+  }
+
   reloadTemplates() {
     let files = this.app.vault.getMarkdownFiles();
 
     this.templates = [];
     this.type2titles = new Map();
+    this.type2lastmod = new Map();
 
     for (var file of files) {
       if (file.path.indexOf(this.settings.templateFolder) === 0) {
@@ -86,6 +127,8 @@ export default class Metatemplates extends Plugin {
         let type = parseFrontMatterEntry(fm, 'type');
         let nameFormat = parseFrontMatterEntry(fm, 'nameFormat');
         this.type2titles.set(type, nameFormat);
+        let lastmodFormat = parseFrontMatterEntry(fm, 'lastmod');
+        this.type2lastmod.set(type, lastmodFormat);
       }
     }
 
@@ -134,6 +177,14 @@ export default class Metatemplates extends Plugin {
 
     let content = await this.app.vault.read(templateFile);
     content = await this.fillTemplate(content);
+
+    let docContent = await this.app.vault.read(activeFile);
+    let createdTime = docContent.match(new RegExp(/Created at: (.+)/));
+
+    if (createdTime[1]) {
+      let date = moment(createdTime[1]).format('YYYY-MM-DD HH:mm:ss');
+      content = content.replace(new RegExp(/date: .+/), "date: '" + date + "'");
+    }
 
     doc.replaceSelection(content);
     editor.focus();
