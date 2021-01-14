@@ -6,7 +6,7 @@ import copy from 'rollup-plugin-copy';
 export default {
   input: 'main.ts',
   output: {
-    dir: 'C:/Users/avirut/Documents/GitHub/obsidian-pluginpilot/.obsidian/plugins/obsidian-metatemplates',
+    dir: 'dist',
     sourcemap: 'inline',
     format: 'cjs',
     exports: 'default',
@@ -18,8 +18,8 @@ export default {
     commonjs(),
     copy({
       targets: [
-        {src: 'manifest.json', dest: 'C:/Users/avirut/Documents/GitHub/obsidian-pluginpilot/.obsidian/plugins/obsidian-metatemplates'},
-        {src: 'styles.css', dest: 'C:/Users/avirut/Documents/GitHub/obsidian-pluginpilot/.obsidian/plugins/obsidian-metatemplates'}
+        {src: 'manifest.json', dest: 'dist'},
+        {src: 'styles.css', dest: 'dist'}
       ]
     })
   ]

@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "baseUrl": ".",
-    "outDir": "C:/Users/avirut/Documents/GitHub/obsidian-pluginpilot/.obsidian/plugins/obsidian-metatemplates",
+    "outDir": "dist",
     "inlineSourceMap": true,
     "inlineSources": true,
     "module": "ESNext",

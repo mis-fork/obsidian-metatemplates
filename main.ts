@@ -1,6 +1,6 @@
 import { Plugin, TFile, MarkdownView, FrontMatterCache, parseFrontMatterEntry } from 'obsidian';
 import { TemplateSuggestModal } from 'modals';
-import { MetatemplatesSettings, MetatemplatesSettingTab, DEFAULT_SETTINGS } from './mmsettings'
+import { MetatemplatesSettings, MetatemplatesSettingTab, DEFAULT_SETTINGS } from './mmsettings';
 
 import type { Moment } from 'moment';
 import * as jsyaml from './js-yaml';
@@ -58,13 +58,12 @@ export default class Metatemplates extends Plugin {
 
       let fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
       let fnf = this.type2titles.get(parseFrontMatterEntry(fm, 'type'));
-
       let newfn = this.fnf2fn(fm, fnf);
 
       if (newfn) {
         let newpath = file.path.substring(0, file.path.lastIndexOf('/')) + '/' + newfn + '.md';
         if (newpath && newpath != file.path) {
-          this.app.fileManager.renameFile(file, newpath);
+          this.app.vault.rename(file, newpath);
         }
       }
     });
@@ -72,7 +71,6 @@ export default class Metatemplates extends Plugin {
     this.app.workspace.on('layout-ready', () => {
       this.reloadTemplates();
     })
-
   }
 
   reloadTemplates() {
@@ -97,7 +95,7 @@ export default class Metatemplates extends Plugin {
   fnf2fn(fm: FrontMatterCache, fnf: string): string {
     let newfn = fnf;
 
-    if (!newfn) {
+    if (!fm || !newfn) {
       return;
     }
 
@@ -125,6 +123,12 @@ export default class Metatemplates extends Plugin {
       return;
     }
 
+    let activeFile = this.app.workspace.getActiveFile();
+    let destFolder = await this.getDestFolder(templateFile);
+    if (destFolder && (!activeFile.parent || activeFile.parent.path != destFolder)) {
+      this.app.vault.rename(activeFile, destFolder + '/' + activeFile.name);
+    }
+
     let editor = active_view.sourceMode.cmEditor;
     let doc = editor.getDoc();
 
@@ -136,21 +140,26 @@ export default class Metatemplates extends Plugin {
   }
 
   async createNoteFromTemplate(templateFile: TFile) {
-    let fm = this.app.metadataCache.getFileCache(templateFile)?.frontmatter;
-    let destFolder = parseFrontMatterEntry(fm, 'destFolder');
-
+    let destFolder = await this.getDestFolder(templateFile);
     let newPath = (destFolder || '') + '/' + moment().format('YYMMDD@HHmmss') + '.md';
-    let content = await this.app.vault.read(templateFile);
-    content = await this.fillTemplate(content);
 
-    let newfile = this.app.vault.create(newPath, content);
-    newfile.then((file) => {
+    let newfile = this.app.vault.create(newPath, '');
+    newfile.then(async (file) => {
       let leaf = this.app.workspace.activeLeaf;
       if (leaf) {
         leaf.openFile(file);
         this.app.workspace.setActiveLeaf(leaf);
       }
+
+      let content = await this.app.vault.read(templateFile);
+      content = await this.fillTemplate(content);
+      this.app.vault.modify(file, content);
     })
+  }
+
+  async getDestFolder(templateFile: TFile) {
+    let fm = this.app.metadataCache.getFileCache(templateFile)?.frontmatter;
+    return parseFrontMatterEntry(fm, 'destFolder');
   }
 
   async fillTemplate(content: string) {
@@ -174,6 +183,11 @@ export default class Metatemplates extends Plugin {
     dump = (<any>dump).replaceAll("\n  - ''", " ['']");
     dump = (<any>dump).replaceAll("<<date>>", moment().format(this.settings.dateFormat));
     dump = (<any>dump).replaceAll("<<time>>", moment().format(this.settings.timeFormat));
+
+    let activeFile = this.app.workspace.getActiveFile();
+    if (activeFile != null) {
+      dump = (<any>dump).replaceAll("<<title>>", activeFile.basename);
+    }
 
     let ans = '---\n' + dump + content.substring(content.lastIndexOf('---'));
 

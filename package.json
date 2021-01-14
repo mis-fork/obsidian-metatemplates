@@ -4,7 +4,8 @@
   "description": "Take advantage of YAML front-matter in generating notes from templates",
   "main": "main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "rollup --config rollup.config.js -w",
+    "build": "rollup --config rollup.config.js"
   },
   "repository": {
     "type": "git",
@@ -21,6 +22,10 @@
     "@rollup/plugin-commonjs": "^17.0.0",
     "@rollup/plugin-node-resolve": "^11.0.1",
     "@rollup/plugin-typescript": "^8.1.0",
+    "@types/node": "^14.14.2",
+    "moment": "^2.29.1",
+    "obsidian": "https://github.com/obsidianmd/obsidian-api/tarball/master",
+    "rollup": "^2.32.1",
     "rollup-plugin-copy": "^3.3.0",
     "tslib": "^2.1.0",
     "typescript": "^4.1.3"
